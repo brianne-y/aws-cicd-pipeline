@@ -1,0 +1,10 @@
+.git
+.gitignore
+*.md
+.terraform/
+terraform.tfvars
+__pycache__/
+*.pyc
+*.pyo
+.github/
+README.md
