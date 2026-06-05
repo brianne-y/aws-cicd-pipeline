@@ -20,12 +20,11 @@ For outbound access from the private subnets (pulling images, sending logs to Cl
 
 The deployment pipeline works like this: a push to the main branch on GitHub triggers GitHub Actions. The workflow authenticates to AWS using OIDC with no stored credentials, builds a new Docker image tagged with the commit SHA, pushes it to ECR, and tells ECS to deploy it using a rolling update strategy. If the new containers fail their health checks, ECS rolls back to the previous version automatically.
 
+```
 Traffic flow:      User → ALB (public subnets) → ECS Fargate tasks (private subnets, no public IP)
-
 Deployment flow:   GitHub push → OIDC auth → Docker build → ECR push → ECS rolling deploy
-
 Outbound access:   ECS tasks → NAT Gateway → internet (image pulls, log delivery)
-
+```
 
 *Full architecture diagram will be added once the build is complete.*
 
@@ -112,7 +111,7 @@ Inside VS Code I created four files directly from the sidebar: app.py, requireme
 I verified the application ran correctly by starting it locally and hitting both endpoints:
 
 <div align="center">
-<img src="screenshots/flask-app-local-test.png" width="500"/>
+<img src="screenshots/flask-app-local-test.png" width="700"/>
 </div>
 
 ### Step 2 — Remote State S3 Bucket
@@ -134,8 +133,6 @@ I confirmed the bucket was created and versioning was enabled directly from the 
 ### Step 3 — Terraform Project Structure
 
 With the S3 backend in place, I created the five Terraform configuration files inside the same project directory: providers.tf, variables.tf, terraform.tfvars, main.tf, and outputs.tf. All five were created directly in VS Code from the sidebar and follow the same structure as Project 2. The one thing worth calling out is that terraform.tfvars is blocked by .gitignore before the very first commit so sensitive values never make it to GitHub. A full explanation of each file's purpose is documented in the Project 2 README.
-
-Here is what each file does and why it exists:
 
 <div align="center">
 <img src="screenshots/project-structure-vscode.png" width="400"/>
@@ -202,11 +199,21 @@ aws ecs update-service \
 
 Once both tasks passed their health checks and showed as running, I opened the ALB DNS URL in a browser and confirmed the Flask application was live and serving traffic.
 
-![Flask App Live ALB](screenshots/flask-app-live-alb.png)
+<div align="center">
+<img src="screenshots/flask-app-live-alb.png" width="800"/>
+</div>
 
-![ECS Service Healthy](screenshots/ecs-service-healthy.png)
+The ECS service confirmed both tasks were running and the deployment status showed as successful.
 
-![Target Group Healthy](screenshots/target-group-healthy.png)
+<div align="center">
+<img src="screenshots/ecs-service-healthy.png" width="800"/>
+</div>
+
+The ALB target group showed both tasks registered as healthy across two availability zones, confirming the load balancer was actively routing traffic to the containers.
+
+<div align="center">
+<img src="screenshots/target-group-healthy.png" width="800"/>
+</div>
 
 ### Step 6 — GitHub Actions Deployment Workflow
 
@@ -261,9 +268,7 @@ The entire process from git push to live deployment took under four minutes with
 Building the infrastructure is not enough. I ran several tests to confirm every security control is actually enforced and not just configured.
 
 **Test 1: Flask application loads through the ALB URL**
-The full traffic path is confirmed working. Internet to ALB to ECS Fargate tasks to Flask application. The URL in the browser is the ALB DNS name, not a direct IP address.
-
-![Flask App Live ALB](screenshots/flask-app-live-alb.png)
+Confirmed in Step 5, the Flask application loads through the ALB URL with no issues.
 
 **Test 2: ECS tasks have no public IP addresses**
 I ran a CLI command against the running tasks and confirmed there is no publicIpv4Address field on the network interface. The only address assigned is a private IP in the 10.0.x.x range inside the VPC.
@@ -373,6 +378,7 @@ Running terraform destroy completed most of the infrastructure but failed at the
 ## Cleanup — Avoid Unnecessary AWS Charges
 
 **Important:** ECR must be emptied before running terraform destroy. Terraform will not delete a non-empty ECR repository and the destroy will fail partway through, leaving orphaned resources running in AWS.
+Delete all images from the ECR repository in the AWS console first, then run terraform destroy from your terminal.
 
 <div align="center">
 <img src="screenshots/ecr-images-deleted.png" width="500"/>
