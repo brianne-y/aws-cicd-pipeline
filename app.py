@@ -5,7 +5,7 @@ app = Flask(__name__)
 def home():
     return jsonify({
 "status": "healthy",
-"message": "Cloud Engineering Portfolio — Project 3",
+"message": "Cloud Engineering Portfolio — Project 3 - Rolling Deploy Verified",
 "environment": os.environ.get('ENVIRONMENT', 'production'),
 "version": os.environ.get('APP_VERSION', '1.0.0')
 })
