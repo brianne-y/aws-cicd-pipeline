@@ -79,7 +79,9 @@ All work in this step runs locally on my Mac. Docker Desktop needs to be open an
 
 I verified Docker was installed and working by running two commands in my terminal. The first confirmed the version. The second pulled the hello-world image from Docker Hub and ran it as a container, printing a confirmation message that the installation was successful.
 
-![Docker Installed and Hello World](screenshots/docker-installed-hello-world.png)
+<div align="center">
+<img src="screenshots/docker-installed-hello-world.png" width="500"/>
+</div>
 
 With Docker confirmed, I opened my terminal and created the project directory:
 
@@ -95,7 +97,9 @@ code .
 
 Inside VS Code I created four files directly from the sidebar: app.py, requirements.txt, .dockerignore, and Dockerfile.
 
-![VS Code Project Structure](screenshots/vscode-project-structure.png)
+<div align="center">
+<img src="screenshots/vscode-project-structure.png" width="300"/>
+</div>
 
 **app.py** is a minimal Flask application with two endpoints. The root endpoint returns a JSON status response. The /health endpoint is what the ALB uses to verify the container is healthy before routing traffic to it. The application listens on 0.0.0.0 so it accepts connections from any network interface inside the container.
 
@@ -107,7 +111,9 @@ Inside VS Code I created four files directly from the sidebar: app.py, requireme
 
 I verified the application ran correctly by starting it locally and hitting both endpoints:
 
-![Flask App Local Test](screenshots/flask-app-local-test.png)
+<div align="center">
+<img src="screenshots/flask-app-local-test.png" width="500"/>
+</div>
 
 ### Step 2 — Remote State S3 Bucket
 
@@ -127,52 +133,33 @@ I confirmed the bucket was created and versioning was enabled directly from the 
 
 ### Step 3 — Terraform Project Structure
 
-With the S3 backend in place, I created the Terraform project files inside the same project directory. All five files were created directly in VS Code from the sidebar.
+With the S3 backend in place, I created the five Terraform configuration files inside the same project directory: providers.tf, variables.tf, terraform.tfvars, main.tf, and outputs.tf. All five were created directly in VS Code from the sidebar and follow the same structure as Project 2. The one thing worth calling out is that terraform.tfvars is blocked by .gitignore before the very first commit so sensitive values never make it to GitHub. A full explanation of each file's purpose is documented in the Project 2 README.
 
 Here is what each file does and why it exists:
 
-**providers.tf** tells Terraform which cloud provider to use, what version is required, and where to store the state file. This is written first because everything else depends on it.
-
-**variables.tf** defines placeholders for values that change between environments or contain sensitive information. The GitHub repository name, alert email address, and application name are all defined here as variables rather than hardcoded into the infrastructure.
-
-**terraform.tfvars** is where those placeholders get filled in with real values. This file never gets committed to GitHub. It is blocked by .gitignore from the very first commit so sensitive values never accidentally get pushed.
-
-**main.tf** is the core of the project. It defines every piece of infrastructure Terraform will build across six sections: VPC and networking, security groups, ECR repository, IAM roles, ALB and ECS cluster and service, and CloudWatch monitoring. This is the file that turns code into real cloud infrastructure.
-
-**outputs.tf** prints useful values to the terminal after terraform apply finishes: the ALB DNS name to test the application, the ECR URL to push images, the ECS cluster and service names for the GitHub Actions workflow, and the GitHub Actions role ARN to configure the OIDC secret.
-
-![Project Structure VS Code](screenshots/project-structure-vscode.png)
+<div align="center">
+<img src="screenshots/project-structure-vscode.png" width="400"/>
+</div>
 
 ### Step 4 — Infrastructure Deployment with Terraform
 
 With all five files written and the S3 backend in place, I ran terraform init to initialize Terraform, download the AWS provider plugin, and connect to the remote backend.
 
-![Terraform Init](screenshots/terraform-init.png)
+<div align="center">
+<img src="screenshots/terraform-init.png" width="500"/>
+</div>
 
 terraform plan validated 37 resources to be created across the full stack. I reviewed the plan before applying to confirm every resource matched what was designed.
 
-![Terraform Plan](screenshots/terraform-plan.png)
+<div align="center">
+<img src="screenshots/terraform-plan.png" width="500"/>
+</div>
 
 Running terraform apply provisioned everything in a single command: VPC, public and private subnets across two availability zones, internet gateway, NAT gateway, route tables, security groups, ECR repository with vulnerability scanning, IAM roles, ALB, ECS cluster, ECS task definition and service, CloudWatch log group, SNS topic, and two CloudWatch alarms.
 
-![Terraform Apply Complete](screenshots/terraform-apply-complete.png)
-
-**VPC and Networking** — I built a VPC with four subnets across two availability zones. Two public subnets host the ALB. Two private subnets host the ECS Fargate tasks. A NAT Gateway in the public subnet gives the private subnets outbound internet access for pulling container images and sending logs to CloudWatch, without exposing the tasks to inbound traffic from the internet.
-
-**Security Groups** — Two security groups enforce least privilege at the network layer. The ALB accepts port 80 from the internet. ECS tasks accept port 5000 from the ALB security group only. A security group rule rather than a CIDR block is used for the connection between them so the rule follows the resource automatically rather than breaking if an IP address changes. This also breaks the circular dependency that would occur if both security groups referenced each other directly.
-
-**ECR Repository** — The container image registry is created with scan_on_push enabled so every image pushed is automatically scanned against a database of known vulnerabilities. A lifecycle policy retains the last 10 images and expires older ones automatically.
-
-**IAM Roles** — Three IAM roles are created. The ECS execution role gives the ECS control plane permission to pull images from ECR and send logs to CloudWatch. The ECS task role is what the Flask application itself uses at runtime and is kept separate from the execution role intentionally. The GitHub Actions role uses OIDC instead of stored credentials and is scoped to this specific repository and the main branch only.
-
-**ALB, ECS Cluster, Task Definition, and Service** — The Application Load Balancer is deployed across both public subnets and is the only entry point for internet traffic. The ECS service is initially set to desired_count of 0 to avoid a failed image pull state before the real Flask image exists in ECR. A lifecycle block tells Terraform to ignore future changes to the task definition and desired count so the GitHub Actions pipeline can manage deployments without Terraform overwriting them.
-
-**CloudWatch and Alerting** — A log group is created with a 30 day retention policy. Two alarms are created: one monitors ALB 5xx error rates and one monitors ECS running task count. Both send email alerts via SNS when thresholds are exceeded.
-
-![VPC Private Subnet NAT](screenshots/vpc-private-subnet-nat.png)
-
-![VPC Public Subnet IGW](screenshots/vpc-public-subnet-igw.png)
-
+<div align="center">
+<img src="screenshots/terraform-apply-complete.png" width="500"/>
+</div>
 
 ### Step 5 — Bootstrap: First Image Push and Service Scale
 
@@ -253,8 +240,151 @@ That push triggered a second pipeline run automatically. This time all seven ste
 
 ![GitHub Actions Pipeline Success](screenshots/github-actions-pipeline-success.png)
 
+### Step 7 — Trigger and Verify the Pipeline
+
+To confirm the pipeline was working end to end I made a small change to the message in app.py and pushed it to GitHub. That push automatically triggered the pipeline without any manual steps.
+
+![GitHub Actions Pipeline Triggered](screenshots/github-actions-pipeline-triggered.png)
+
+The pipeline built a new Docker image tagged with the commit SHA, pushed it to ECR, downloaded the current task definition, injected the new image URI, and deployed it to ECS using a rolling update. New containers started with the updated image, passed their health checks, and only then did ECS stop the old containers. The application never went down during the swap.
+
+![GitHub Actions Rolling Deploy](screenshots/github-actions-rolling-deploy.png)
+
+Once the pipeline completed I refreshed the ALB URL in the browser and confirmed the updated message was live.
+
+![Flask App Updated Message](screenshots/flask-app-updated-message.png)
+
+The entire process from git push to live deployment took under four minutes with zero manual steps after the push.
+
+### Step 8 — Architecture Verification
+
+Building the infrastructure is not enough. I ran several tests to confirm every security control is actually enforced and not just configured.
+
+**Test 1: Flask application loads through the ALB URL**
+The full traffic path is confirmed working. Internet to ALB to ECS Fargate tasks to Flask application. The URL in the browser is the ALB DNS name, not a direct IP address.
+
+![Flask App Live ALB](screenshots/flask-app-live-alb.png)
+
+**Test 2: ECS tasks have no public IP addresses**
+I ran a CLI command against the running tasks and confirmed there is no publicIpv4Address field on the network interface. The only address assigned is a private IP in the 10.0.x.x range inside the VPC.
+
+![ECS Task No Public IP](screenshots/ecs-task-no-public-ip.png)
+
+I then attempted to connect directly to that private IP from my Mac terminal. The connection timed out as expected. There is no network path from the internet to the ECS tasks directly.
+
+![ECS Task Direct Access Blocked](screenshots/ecs-task-direct-access-blocked.png)
+
+**Test 3: ECR repository has vulnerability scanning enabled**
+I confirmed scan_on_push is set to true on the ECR repository. Every image pushed triggers an automatic scan against a database of known vulnerabilities.
+
+![ECR Scan On Push Confirmed](screenshots/ecr-scan-on-push-confirmed.png)
+
+The scan results showed several vulnerabilities in Perl packages bundled inside the base Python image. These are not vulnerabilities in the Flask application itself. They are OS level packages that came with python:3.12-slim. In a production environment this would be addressed by switching to a more minimal base image or setting up automated alerts for critical findings. For this project it confirms the scanning is working as designed.
+
+![ECR Vulnerability Scan](screenshots/ecr-vulnerability-scan.png)
+
+**Test 4: VPC network separation confirmed**
+The VPC resource map confirms the private subnets route through the NAT Gateway for outbound access only, and the public subnets route through the internet gateway. There is no direct route from the internet to the private subnets where the ECS tasks live.
+
+![VPC Private Subnet NAT](screenshots/vpc-private-subnet-nat.png)
+
+![VPC Public Subnet IGW](screenshots/vpc-public-subnet-igw.png)
+
+### Step 9 — CloudWatch Logs and Monitoring
+
+With the application running I verified that logs were being collected and alarms were active.
+
+I opened CloudWatch Log Insights and ran a query against the /ecs/project-3-flask log group to pull the 20 most recent log entries. The results showed the ALB health check hitting the /health endpoint every 30 seconds, confirming the container was actively serving traffic and logging every request.
+
+![CloudWatch Logs Insights](screenshots/cloudwatch-logs-insights.png)
+
+Drilling into a single log entry confirms the ALB health check is hitting the /health endpoint every 30 seconds and receiving a 200 response back from the container, proving the application is actively serving traffic.
+
+![CloudWatch Log Entry Detail](screenshots/cloudwatch-log-entry-detail.png)
+
+Both CloudWatch alarms were confirmed active and in OK state — one monitoring ALB 5xx error rates and one monitoring ECS running task count.
+
+![CloudWatch Alarms OK](screenshots/cloudwatch-alarms-ok.png)
+
+To verify the alerting pipeline worked end to end I scaled the ECS service to zero tasks intentionally. The ECS tasks low alarm triggered within two minutes and an email notification arrived via SNS confirming the full observability stack was working.
+
+<div align="center">
+<img src="screenshots/sns-alarm-email.png" width="600"/>
+</div>
+
+## Results — What the Working System Demonstrates
+
+The Flask application loads through the ALB DNS URL. ECS Fargate tasks have no public IP addresses and are unreachable from the internet directly. Every deployment happens automatically on a git push with no manual steps after the code is pushed. A bad deployment rolls back automatically without human intervention.
+
+The entire infrastructure was provisioned from code with a single terraform apply command across 37 resources and can be fully torn down with a single terraform destroy. The GitHub Actions pipeline authenticated to AWS without a single stored credential using OIDC. Every container image in ECR is tagged with the exact commit SHA that produced it, creating a full audit trail from code to production.
+
+This project demonstrated that automation and security are not competing priorities. The pipeline that removed human effort from deployments is the same pipeline that enforced consistent security controls on every single build.
+
+## Troubleshooting — Real Issues Encountered and Resolved
+
+**Issue 1 — IndentationError in app.py**
+When I first ran the Flask application locally, Python threw an IndentationError pointing to line 6. The error message said "expected an indented block after function definition on line 5." The root cause was a missing or incorrect indentation on the return statement inside the home() function. Python cannot run a file with a syntax error so the fix had to happen before anything else. I corrected the indentation in VS Code and the application ran successfully on the next attempt.
+
+**Issue 2 — ECS tasks crashing on startup**
+After scaling the service to 2 tasks, all tasks showed as stopped in the ECS console. The root cause was that the task definition was still pointing to the placeholder Python image with no Flask app and nothing listening on port 5000. The ALB health check hit /health, got no response, and ECS stopped the task. The fix was registering a new task definition revision pointing to the real bootstrap image in ECR and forcing a new deployment. Once the correct image was deployed both tasks came up healthy.
+
+**Issue 3 — GitHub Actions pipeline failed on first run**
+The first pipeline run failed with "open Dockerfile: no such file or directory." The workflow file existed on GitHub but the actual project code had never been pushed. GitHub Actions had nothing to build from. The fix was pushing the local project folder to GitHub first, which triggered a second pipeline run automatically. That run succeeded with all seven steps completing in 3 minutes and 21 seconds.
+
+**Issue 4 — Git push rejected with authentication failed**
+The first attempt to push local code to GitHub failed with "Authentication failed." GitHub no longer accepts account passwords for Git operations over HTTPS. The fix was generating a classic Personal Access Token scoped to repo permissions and using that as the password instead. The push succeeded immediately after.
+
+**Issue 5 — Git push rejected with fetch first**
+After generating the token, the push was rejected because the remote repository had the workflow file that was created directly on GitHub and my local machine did not have it. Running git pull origin main with rebase pulled the remote changes first and the subsequent push succeeded.
+
+**Issue 6 — terraform destroy blocked by non-empty ECR repository**
+Running terraform destroy completed most of the infrastructure but failed at the ECR repository because it contained images. Terraform will not delete a non-empty ECR repository by default. I deleted the images manually through the ECR console and ran terraform destroy again. The second run completed with the remaining resources destroyed.
+
+![Terraform Destroy ECR Error](screenshots/terraform-destroy-ecr-error.png)
 
 
+## Security Implementation Summary
+
+| Layer | Control | Purpose |
+|-------|---------|---------|
+| ECS | assign_public_ip = false | Tasks are unreachable from the internet directly |
+| ECS | Tasks in private subnets | No network route from the internet to the compute layer |
+| ECS | Deployment circuit breaker | Failed deployments roll back automatically |
+| IAM | OIDC authentication | No stored AWS credentials anywhere in the pipeline |
+| IAM | OIDC scoped to repo and branch | Only this repository on the main branch can authenticate |
+| IAM | Separate execution and task roles | Control plane permissions isolated from application runtime |
+| ECR | scan_on_push = true | Every image scanned for vulnerabilities on every push |
+| ALB | Single entry point | All internet traffic enters through the ALB only |
+| Git | terraform.tfvars in .gitignore | Sensitive values never committed to GitHub |
+
+
+## Key Learnings
+
+- Automation and security are not competing priorities. The pipeline that removed manual effort from deployments is the same pipeline that enforced consistent security controls on every single build. Removing the human from the deployment process also removed the human error.
+
+- Two IAM roles are better than one. Separating the ECS execution role from the ECS task role means a vulnerability in the application cannot be used to access infrastructure level permissions. Least privilege at both layers independently is more secure than least privilege at one combined layer.
+
+- OIDC is worth the setup complexity. Configuring the trust policy takes more work upfront than dropping an access key into a GitHub secret, but the result is a pipeline with no long lived credentials to rotate, leak, or forget about. The security profile is permanently better.
+
+- The task definition is the source of truth for what runs in production. Understanding that ECS pulls instructions from the task definition, not from whatever image happens to be in ECR, was the key to diagnosing why tasks were crashing during the bootstrap phase.
+
+- Read the error message before doing anything else. Every issue in this build was resolved by reading what the terminal actually said and finding the root cause rather than guessing. The GitHub Actions error said the Dockerfile was missing. The ECS console showed tasks stopping immediately. The git error said fetch first. Each message pointed directly to the fix.
+
+## Cleanup — Avoid Unnecessary AWS Charges
+
+**Important:** ECR must be emptied before running terraform destroy. Terraform will not delete a non-empty ECR repository and the destroy will fail partway through, leaving orphaned resources running in AWS.
+
+<div align="center">
+<img src="screenshots/ecr-images-deleted.png" width="500"/>
+</div>
+
+
+
+<div align="center">
+<img src="screenshots/terraform-destroy-complete.png" width="500"/>
+</div>
+
+All VPC, ECS, ALB, ECR, IAM, and CloudWatch resources are now removed by terraform destroy once the ECR repository is empty.
 
 ## Let's Connect!
 
