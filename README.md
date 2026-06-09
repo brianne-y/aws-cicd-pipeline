@@ -26,8 +26,6 @@ Deployment flow:   GitHub push → OIDC auth → Docker build → ECR push → E
 Outbound access:   ECS tasks → NAT Gateway → internet (image pulls, log delivery)
 ```
 
-*Full architecture diagram will be added once the build is complete.*
-
 ---
 
 ## AWS Services Used
